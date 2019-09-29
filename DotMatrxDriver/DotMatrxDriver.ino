@@ -18,13 +18,13 @@ int latchPin = 14;	//	595_ST_CP
 int clockPin = 15;	//	595_SH_CP
 int clearPin = 18;	//	595_MR
 
-const byte payloadArray[19] = {0x1B,0x40,0x1B,0x23,0x48,0x65,0x6C,0x6C,0x6F,0x2C,0x20,0x77,0x6F,0x72,0X6C,0x64,0x21,0x1B,0x3C};
+const byte payloadArray[16] = {0x48,0x65,0x6C,0x6C,0x6F,0x2C,0x20,0x77,0x6F,0x72,0X6C,0x64,0x21,0x0D,0x0A,0x00}; //H,e,l,l,o,,, ,w,o,r,l,d,!,CR,LF
 
 
 
 byte data;
 byte dataArray[10];
-int i = 0;
+int attempt = 0;
 
 void setup() {
   Serial.begin(9600);
@@ -51,7 +51,7 @@ void setup() {
   pinMode(ERR, INPUT);
 
 
-  digitalWrite(outPin, 0);
+  digitalWrite(outPin, 1);
   digitalWrite(clearPin, 1);
 
   
@@ -72,65 +72,72 @@ void setup() {
 }
 
 void loop() {
-    int valACK = digitalRead(ACK);
-    int valBUSY = digitalRead(BUSY);
-    int valPE = digitalRead(PE);
-    int valSLCT = digitalRead(SLCT);
-    int valERR = digitalRead(ERR);
-    Serial.print("ACK:\t");
-    Serial.println(valACK);
-    Serial.print("BUSY:\t");
-    Serial.println(valBUSY);
-    Serial.print("PE:\t");
-    Serial.println(valPE);
-    Serial.print("SLCT:\t");
-    Serial.println(valSLCT);
-    Serial.print("ERR:\t");
-    Serial.println(valERR);
+  while(!Serial){}
+  if(isOnline(SLCT)){
+    attempt = 0;
+    for(int i = 0; i < sizeof(payloadArray); i++){
+      delay(10);
+      data = payloadArray[i];
+      int valACK = digitalRead(ACK);
+      int valBUSY = digitalRead(BUSY);
+      int valPE = digitalRead(PE);
+      int valSLCT = digitalRead(SLCT);
+      int valERR = digitalRead(ERR);
+      Serial.print(data);
+      Serial.print("\t");
+      Serial.println(i);
+      Serial.print("ACK:\t");
+      Serial.println(valACK);
+      Serial.print("BUSY:\t");
+      Serial.println(valBUSY);
+      Serial.print("PE:\t");
+      Serial.println(valPE);
+      Serial.print("SLCT:\t");
+      Serial.println(valSLCT);
+      Serial.print("ERR:\t");
+      Serial.println(valERR);
+      Serial.println();
+      while(!(valBUSY == 0 && valACK == 1)) {
+        Serial.println("Waiting");
+        delay(1);
+        break;
+      }
+      if(valBUSY == 0 && valACK == 1) {
+        digitalWrite(outPin, 0);
+        digitalWrite(latchPin, 0);
+        shiftOut(dataPin, clockPin, data);
+        digitalWrite(latchPin, 1);
+        delayMicroseconds(50);
+        delayMicroseconds(50);
+        digitalWrite(STROBE, 0);
+        delayMicroseconds(50);
+        digitalWrite(STROBE, 1);
+        delayMicroseconds(50);
+        digitalWrite(latchPin, 0);
+        valBUSY = digitalRead(BUSY);
+        Serial.println("Printing");
+      } else {
+        Serial.println("Waiting");
+      }
+    }
+  } else {
+    Serial.println("Printer Offline");
+    Serial.print("Attempt:\t");
+    Serial.println(attempt);
+    attempt++;
+    delay(500);
+  }
+  while(digitalRead(PE) == 1){
     Serial.println();
-//    while(valBUSY == 0) {
-//        digitalWrite(latchPin, 0);
-//        shiftOut(dataPin, clockPin, data);
-//        digitalWrite(latchPin, 1);
-//        delayMicroseconds(50);
-//        digitalWrite(outPin, 0);
-//        delayMicroseconds(50);
-//        digitalWrite(STROBE, 0);
-//        delayMicroseconds(50);
-//        digitalWrite(STROBE, 1);
-//        valBUSY = digitalRead(BUSY);
-  
-//  byte j = 0x00;
-//  digitalWrite(latchPin, 0);
-//  shiftOut(dataPin, clockPin, j);
-//  digitalWrite(latchPin, 1);
-//  for(int i=0;i<10;i++) {
-//    digitalWrite(outPin, 0);
-//    delay(300);
-//    digitalWrite(outPin, 1);
-//    delay(300);
-//  }
-//  for(int i=0;i<13;i++) {
-//    data = payloadArray[i];
-//    digitalWrite(outPin, 1);
-//    digitalWrite(latchPin, 0);
-//    shiftOut(dataPin, clockPin, data);
-//    digitalWrite(latchPin, 1);
-//    delay(5);
-//    digitalWrite(outPin, 0);
-//    delay(500);
-//    digitalWrite(STROBE, 0);
-//    delay(500);
-//    digitalWrite(STROBE, 1);
-//    delay(5);
-//  }
-//  while (true){
-//    digitalWrite(STROBE, 1);
-//    digitalWrite(outPin, 1);
-//    }
-  
-//  testPayload(payloadArray);
-//  while(true) {}
+    Serial.println("Paper Out, printing complete");
+    delay(500);
+    break;
+  }
+  while((digitalRead(ACK) + digitalRead(BUSY) + digitalRead(PE) + digitalRead(SLCT) + digitalRead(ERR)) == 0) {
+    Serial.println("Printer Not Connected");
+    delay(1000);
+    break;
+  }
 }
 
 //void testPayload(byte payload) {
@@ -181,4 +188,34 @@ void shiftOut(int myDataPin, int myClockPin, byte myDataOut) {
   }
 
   digitalWrite(myClockPin, 0);
+}
+
+void sendData(byte myData) {
+  digitalWrite(latchPin, 0);
+  shiftOut(dataPin, clockPin, myData);
+  digitalWrite(latchPin, 1);
+  delayMicroseconds(50);
+  digitalWrite(outPin, 0);
+  delayMicroseconds(50);
+  digitalWrite(STROBE, 0);
+  delayMicroseconds(50);
+  digitalWrite(STROBE, 1);
+  delayMicroseconds(50);
+  digitalWrite(outPin, 1);
+}
+
+bool isOnline(int selectPin) {
+  if(digitalRead(selectPin) == 1) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool paperOut(int paperPin) {
+  if(digitalRead(paperPin == 1)) {
+    return true;
+  } else {
+    return false;
+  }
 }
