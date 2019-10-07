@@ -35,6 +35,7 @@ int valERR;
 
 int discon = 0;
 int initial = 0;
+bool printingcomp = false;
 
 void setup() {
   Serial.begin(9600);
@@ -109,16 +110,6 @@ void loop() {
       Serial.println("Waiting for Printer");
       break;  
     }
-    if(initial == 0) {
-      for(int j; j < sizeof(initArray); j++){
-        if(valBUSY == 0 && valACK == 1) {
-          data = initArray[i];
-          printData(outPin, latchPin, dataPin, clockPin, STROBE, data);
-          valBUSY = digitalRead(BUSY);
-        }
-      }
-      initial = 1;
-    }
     if(i<sizeof(payloadArray)){
       if(valBUSY == 0 && valACK == 1) {
         data = payloadArray[i];
@@ -128,7 +119,6 @@ void loop() {
       }
     } else {
       Serial.println("Printing Complete");
-      i = 0; 
     }
   } else {
     Serial.println("Printer Offline");
