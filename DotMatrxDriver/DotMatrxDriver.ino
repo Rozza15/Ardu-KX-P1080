@@ -18,8 +18,8 @@ int latchPin = 14;	//	595_ST_CP
 int clockPin = 15;	//	595_SH_CP
 int clearPin = 18;	//	595_MR
 
-const byte payloadArray[18] = {0x48,0x65,0x6C,0x6C,0x6F,0x2C,0x20,0x77,0x6F,0x72,0X6C,0x64,0x21,0x1B,0x3C,0x0A,0x0D,0x00}; //H,e,l,l,o,,, ,w,o,r,l,d,!,CR,LF
-
+const byte payloadArray[20] = {"Hello, world!\x0A\x0D"}; //H,e,l,l,o,,, ,w,o,r,l,d,!,CR,LF
+const byte initArray[20] = {"\x1B\x6C\x03\x1B\x6C\x46"};
 
 
 byte data;
@@ -34,6 +34,8 @@ int valSLCT;
 int valERR;
 
 int discon = 0;
+int initial = 0;
+bool printingcomp = false;
 
 void setup() {
   Serial.begin(9600);
@@ -111,24 +113,12 @@ void loop() {
     if(i<sizeof(payloadArray)){
       if(valBUSY == 0 && valACK == 1) {
         data = payloadArray[i];
-        digitalWrite(outPin, 0);
-        digitalWrite(latchPin, 0);
-        shiftOut(dataPin, clockPin, data);
-        digitalWrite(latchPin, 1);
-        delayMicroseconds(50);
-        delayMicroseconds(50);
-        digitalWrite(STROBE, 0);
-        delayMicroseconds(50);
-        digitalWrite(STROBE, 1);
-        delayMicroseconds(50);
-        digitalWrite(latchPin, 0);
+        printData(outPin, latchPin, dataPin, clockPin, STROBE, data);
         valBUSY = digitalRead(BUSY);
-        Serial.println("Printing");
         i++;
       }
     } else {
       Serial.println("Printing Complete");
-      i = 0; 
     }
   } else {
     Serial.println("Printer Offline");
@@ -203,20 +193,6 @@ void shiftOut(int myDataPin, int myClockPin, byte myDataOut) {
   digitalWrite(myClockPin, 0);
 }
 
-void sendData(byte myData) {
-  digitalWrite(latchPin, 0);
-  shiftOut(dataPin, clockPin, myData);
-  digitalWrite(latchPin, 1);
-  delayMicroseconds(50);
-  digitalWrite(outPin, 0);
-  delayMicroseconds(50);
-  digitalWrite(STROBE, 0);
-  delayMicroseconds(50);
-  digitalWrite(STROBE, 1);
-  delayMicroseconds(50);
-  digitalWrite(outPin, 1);
-}
-
 bool isOnline(int selectPin) {
   if(digitalRead(selectPin) == 1) {
     return true;
@@ -239,4 +215,19 @@ void getConts() {
   valPE = digitalRead(PE);
   valSLCT = digitalRead(SLCT);
   valERR = digitalRead(ERR);
+}
+
+void printData(int myOutPin, int myLatchPin, int myDataPin, int myClockPin, int myStrobePin, byte myData) {
+  digitalWrite(myOutPin, 0);
+  digitalWrite(myLatchPin, 0);
+  shiftOut(myDataPin, myClockPin, myData);
+  digitalWrite(myLatchPin, 1);
+  delayMicroseconds(50);
+  delayMicroseconds(50);
+  digitalWrite(myStrobePin, 0);
+  delayMicroseconds(50);
+  digitalWrite(myStrobePin, 1);
+  delayMicroseconds(50);
+  digitalWrite(myLatchPin, 0);
+  Serial.println("Printing");
 }
